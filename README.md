@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/cheukyin175-metabase-mcp-badge.png)](https://mseep.ai/app/cheukyin175-metabase-mcp)
+
 # Metabase FastMCP Server
 
 A FastMCP (Model Context Protocol) server for Metabase, built with Python. This server provides tools to interact with Metabase databases, execute queries, manage cards, and work with collections.
