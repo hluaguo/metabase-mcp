@@ -306,6 +306,63 @@ async def execute_query(
         raise ToolError(error_msg) from e
 
 
+@mcp.tool
+async def execute_mongodb_query(
+    database_id: int,
+    collection: str,
+    query: Any,
+    ctx: Context,
+    native_parameters: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
+    """
+    Execute a MongoDB native query against a Metabase database.
+
+    Args:
+        database_id: The ID of the MongoDB database to query.
+        collection: The MongoDB collection name.
+        query: The MongoDB query (aggregation pipeline array or query object).
+        native_parameters: Optional parameters for the query.
+
+    Returns:
+        Query execution results.
+    """
+    try:
+        import json
+
+        await ctx.info(f"Executing MongoDB query on database {database_id}, collection {collection}")
+
+        # Convert query to JSON string if it's not already a string
+        if isinstance(query, (list, dict)):
+            query_string = json.dumps(query)
+            await ctx.debug(f"Converted query object to JSON string")
+        else:
+            query_string = str(query)
+
+        payload = {
+            "database": database_id,
+            "type": "native",
+            "native": {
+                "query": query_string,
+                "collection": collection
+            }
+        }
+
+        if native_parameters:
+            payload["native"]["parameters"] = native_parameters
+            await ctx.debug(f"Query parameters: {len(native_parameters)} parameters provided")
+
+        result = await metabase_client.request("POST", "/dataset", json=payload)
+
+        row_count = len(result.get("data", {}).get("rows", []))
+        await ctx.info(f"MongoDB query executed successfully, returned {row_count} rows")
+
+        return result
+    except Exception as e:
+        error_msg = f"Error executing MongoDB query: {e}"
+        await ctx.error(error_msg)
+        raise ToolError(error_msg) from e
+
+
 # =============================================================================
 # Tool Definitions - Card/Question Operations
 # =============================================================================
@@ -416,6 +473,66 @@ async def create_card(
         return result
     except Exception as e:
         error_msg = f"Error creating card: {e}"
+        await ctx.error(error_msg)
+        raise ToolError(error_msg) from e
+
+
+@mcp.tool
+async def create_mongodb_card(
+    name: str,
+    database_id: int,
+    collection: str,
+    query: str,
+    ctx: Context,
+    description: str | None = None,
+    collection_id: int | None = None,
+    visualization_settings: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Create a new MongoDB question/card in Metabase.
+
+    Args:
+        name: Name of the card.
+        database_id: ID of the MongoDB database.
+        collection: MongoDB collection name.
+        query: MongoDB query string (aggregation pipeline or query).
+        description: Optional description.
+        collection_id: Optional collection to place the card in.
+        visualization_settings: Optional visualization configuration.
+
+    Returns:
+        The created MongoDB card object.
+    """
+    try:
+        await ctx.info(f"Creating new MongoDB card '{name}' for collection {collection}")
+
+        payload = {
+            "name": name,
+            "database_id": database_id,
+            "dataset_query": {
+                "database": database_id,
+                "type": "native",
+                "native": {
+                    "query": query,
+                    "collection": collection
+                },
+            },
+            "display": "table",
+            "visualization_settings": visualization_settings or {},
+        }
+
+        if description:
+            payload["description"] = description
+        if collection_id is not None:
+            payload["collection_id"] = collection_id
+            await ctx.debug(f"MongoDB card will be placed in collection {collection_id}")
+
+        result = await metabase_client.request("POST", "/card", json=payload)
+        await ctx.info(f"Successfully created MongoDB card with ID {result.get('id')}")
+
+        return result
+    except Exception as e:
+        error_msg = f"Error creating MongoDB card: {e}"
         await ctx.error(error_msg)
         raise ToolError(error_msg) from e
 
