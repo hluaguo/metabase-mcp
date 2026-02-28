@@ -3,7 +3,7 @@
 [![PyPI version](https://badge.fury.io/py/metabase-mcp.svg)](https://badge.fury.io/py/metabase-mcp)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![FastMCP](https://img.shields.io/badge/FastMCP-v2.12+-green.svg)](https://github.com/jlowin/fastmcp)
+[![FastMCP](https://img.shields.io/badge/FastMCP-v3.1.0-green.svg)](https://github.com/jlowin/fastmcp)
 
 A high-performance **Model Context Protocol (MCP) server** for **Metabase**, enabling AI assistants like **Claude**, **Cursor**, and other MCP clients to interact seamlessly with your Metabase instance. Query databases, execute SQL, manage dashboards, and automate analytics workflows with natural language through AI-powered database operations.
 
