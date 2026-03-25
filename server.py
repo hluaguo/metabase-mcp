@@ -31,6 +31,15 @@ METABASE_URL = os.getenv("METABASE_URL")
 METABASE_USER_EMAIL = os.getenv("METABASE_USER_EMAIL")
 METABASE_PASSWORD = os.getenv("METABASE_PASSWORD")
 METABASE_API_KEY = os.getenv("METABASE_API_KEY")
+METABASE_HTTP_TIMEOUT = os.getenv("METABASE_HTTP_TIMEOUT", "300.0")
+
+try:
+    METABASE_HTTP_TIMEOUT_SECONDS = float(METABASE_HTTP_TIMEOUT)
+except ValueError as exc:
+    raise ValueError("METABASE_HTTP_TIMEOUT must be a valid number (seconds)") from exc
+
+if METABASE_HTTP_TIMEOUT_SECONDS <= 0:
+    raise ValueError("METABASE_HTTP_TIMEOUT must be greater than 0")
 
 if not METABASE_URL or (
     not METABASE_API_KEY and (not METABASE_USER_EMAIL or not METABASE_PASSWORD)
@@ -65,7 +74,7 @@ class MetabaseClient:
         self.session_token: str | None = None
         self.api_key: str | None = METABASE_API_KEY
         self.auth_method = AuthMethod.API_KEY if METABASE_API_KEY else AuthMethod.SESSION
-        self.client = httpx.AsyncClient(timeout=30.0)
+        self.client = httpx.AsyncClient(timeout=METABASE_HTTP_TIMEOUT_SECONDS)
 
         logger.info(f"Using {self.auth_method.value} authentication method")
 
