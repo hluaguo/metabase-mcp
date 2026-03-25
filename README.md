@@ -108,7 +108,7 @@ METABASE_PASSWORD=your-password
 
 #### Optional: Metabase API HTTP Timeout
 ```env
-METABASE_HTTP_TIMEOUT=300.0  # Default: 300.0 seconds
+METABASE_HTTP_TIMEOUT=30.0  # Default: 30.0 seconds
 ```
 
 #### Optional: Custom Host/Port for SSE/HTTP
