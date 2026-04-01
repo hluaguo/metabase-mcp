@@ -535,6 +535,43 @@ async def create_mongodb_card(
         raise ToolError(error_msg) from e
 
 
+@mcp.tool
+async def update_card_display(
+    card_id: int,
+    display: str,
+    ctx: Context,
+    visualization_settings: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """
+    Update the display type of a saved question/card in Metabase.
+
+    Args:
+        card_id: The ID of the card to update.
+        display: The display type (e.g. "table", "bar", "line", "pie", "scalar", "row", "area", "combo", "pivot", "smartscalar", "funnel", "waterfall", "map").
+        visualization_settings: Optional visualization settings to apply with the display change.
+
+    Returns:
+        The updated card object.
+    """
+    try:
+        await ctx.info(f"Updating card {card_id} display to '{display}'")
+
+        payload: dict[str, Any] = {"display": display}
+
+        if visualization_settings is not None:
+            payload["visualization_settings"] = visualization_settings
+            await ctx.debug(f"Applying visualization settings: {visualization_settings}")
+
+        result = await metabase_client.request("PUT", f"/card/{card_id}", json=payload)
+        await ctx.info(f"Successfully updated card {card_id} display to '{display}'")
+
+        return result
+    except Exception as e:
+        error_msg = f"Error updating card {card_id} display: {e}"
+        await ctx.error(error_msg)
+        raise ToolError(error_msg) from e
+
+
 # =============================================================================
 # Tool Definitions - Dashboard Operations
 # =============================================================================
@@ -556,6 +593,123 @@ async def list_dashboards(ctx: Context) -> list[dict[str, Any]]:
         return result
     except Exception as e:
         error_msg = f"Error listing dashboards: {e}"
+        await ctx.error(error_msg)
+        raise ToolError(error_msg) from e
+
+
+@mcp.tool
+async def get_dashboard_cards(dashboard_id: int, ctx: Context) -> list[dict[str, Any]]:
+    """
+    Get the cards and their layout information for a specific dashboard.
+
+    Returns each card's id, name, display type, size, and position on the
+    dashboard grid (col, row, size_x, size_y).
+
+    Args:
+        dashboard_id: The ID of the dashboard.
+
+    Returns:
+        A list of dashboard card objects with layout and card metadata.
+    """
+    try:
+        await ctx.info(f"Fetching cards layout for dashboard {dashboard_id}")
+        result = await metabase_client.request("GET", f"/dashboard/{dashboard_id}")
+
+        dashcards = result.get("dashcards", result.get("ordered_cards", []))
+        await ctx.info(
+            f"Successfully retrieved {len(dashcards)} cards from dashboard {dashboard_id}"
+        )
+
+        cards_layout = []
+        for dashcard in dashcards:
+            card_info: dict[str, Any] = {
+                "dashcard_id": dashcard.get("id"),
+                "card_id": dashcard.get("card_id"),
+                "col": dashcard.get("col"),
+                "row": dashcard.get("row"),
+                "size_x": dashcard.get("size_x"),
+                "size_y": dashcard.get("size_y"),
+            }
+
+            card = dashcard.get("card")
+            if card:
+                card_info["card_name"] = card.get("name")
+                card_info["card_display"] = card.get("display")
+                card_info["card_description"] = card.get("description")
+
+            cards_layout.append(card_info)
+
+        return cards_layout
+    except Exception as e:
+        error_msg = f"Error fetching dashboard {dashboard_id} cards: {e}"
+        await ctx.error(error_msg)
+        raise ToolError(error_msg) from e
+
+
+@mcp.tool
+async def add_card_to_dashboard(
+    dashboard_id: int,
+    card_id: int,
+    ctx: Context,
+    col: int = 0,
+    row: int = 0,
+    size_x: int = 6,
+    size_y: int = 4,
+) -> dict[str, Any]:
+    """
+    Add an existing card to a dashboard at a specified position and size.
+
+    Args:
+        dashboard_id: The ID of the dashboard to add the card to.
+        card_id: The ID of the card to add.
+        col: Column position on the dashboard grid (default: 0).
+        row: Row position on the dashboard grid (default: 0).
+        size_x: Width of the card in grid units (default: 6).
+        size_y: Height of the card in grid units (default: 4).
+
+    Returns:
+        The created dashboard card object.
+    """
+    try:
+        await ctx.info(f"Adding card {card_id} to dashboard {dashboard_id}")
+
+        # Fetch existing dashboard to get current dashcards
+        dashboard = await metabase_client.request("GET", f"/dashboard/{dashboard_id}")
+        existing_dashcards = dashboard.get("dashcards", dashboard.get("ordered_cards", []))
+
+        # Preserve existing dashcards with their current layout
+        dashcards = [
+            {
+                "id": dc["id"],
+                "card_id": dc.get("card_id"),
+                "row": dc.get("row"),
+                "col": dc.get("col"),
+                "size_x": dc.get("size_x"),
+                "size_y": dc.get("size_y"),
+            }
+            for dc in existing_dashcards
+        ]
+
+        # Append new card with id: -1 to indicate a new entry
+        dashcards.append({
+            "id": -1,
+            "card_id": card_id,
+            "row": row,
+            "col": col,
+            "size_x": size_x,
+            "size_y": size_y,
+        })
+
+        result = await metabase_client.request(
+            "PUT", f"/dashboard/{dashboard_id}", json={"dashcards": dashcards}
+        )
+        await ctx.info(
+            f"Successfully added card {card_id} to dashboard {dashboard_id} at ({col}, {row})"
+        )
+
+        return result
+    except Exception as e:
+        error_msg = f"Error adding card {card_id} to dashboard {dashboard_id}: {e}"
         await ctx.error(error_msg)
         raise ToolError(error_msg) from e
 
