@@ -225,6 +225,15 @@ fastmcp install server.py -n "Metabase MCP"
 | `create_card` | Create new questions/cards with SQL queries |
 | `create_mongodb_card` | Create new MongoDB questions/cards with native query support |
 
+### Dashboard Management
+| Tool | Description |
+|------|------------|
+| `list_dashboards` | List all dashboards with metadata |
+| `get_dashboard_cards` | Get cards and layout for a specific dashboard |
+| `add_card_to_dashboard` | Add an existing card to a dashboard at a specified position |
+| `copy_dashboard` | Copy a dashboard including all cards, tabs, and filters. Supports deep copy (independent duplicate cards) or shallow copy (shared cards) via `is_deep_copy` |
+| `copy_dashboard_tab` | Copy a tab into a dashboard, preserving card layouts, parameter mappings, and visualization settings. Optionally specify a destination dashboard |
+
 ### Collection Management
 | Tool | Description |
 |------|------------|
