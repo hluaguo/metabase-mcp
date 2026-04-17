@@ -231,8 +231,8 @@ fastmcp install server.py -n "Metabase MCP"
 | `list_dashboards` | List all dashboards with metadata |
 | `get_dashboard_cards` | Get cards and layout for a specific dashboard |
 | `add_card_to_dashboard` | Add an existing card to a dashboard at a specified position |
-| `copy_dashboard` | Copy a dashboard including all cards, tabs, and filters. Supports deep copy (independent duplicate cards) or shallow copy (shared cards) via `is_deep_copy` |
-| `copy_dashboard_tab` | Copy a tab into a dashboard, preserving card layouts, parameter mappings, and visualization settings. Optionally specify a destination dashboard |
+| `copy_dashboard` | Copy a dashboard including all cards, tabs, and filters. Defaults to shallow copy (shared cards); set `is_deep_copy=true` for independent duplicate cards |
+| `copy_dashboard_tab` | Copy a tab within a dashboard, preserving card layouts, parameter mappings, and visualization settings. Defaults to shallow copy; set `is_deep_copy=true` for independent duplicate cards |
 
 ### Collection Management
 | Tool | Description |

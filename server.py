@@ -660,24 +660,24 @@ async def copy_dashboard(
     dashboard_id: int,
     ctx: Context,
     collection_id: int | None = None,
-    is_deep_copy: bool = True,
+    is_deep_copy: bool = False,
 ) -> dict[str, Any]:
     """
     Create a copy of a dashboard, including all cards, tabs, and filters.
 
     The new dashboard is named "{original name} - Copy".
 
-    When is_deep_copy is True (default), all cards are duplicated so the new
-    dashboard is fully independent. When False, the copy shares the original
-    cards — changes to those questions will affect both dashboards.
+    When is_deep_copy is False (default), the copy shares the original cards —
+    changes to those questions will affect both dashboards. When True, all cards
+    are duplicated so the new dashboard is fully independent.
 
     Args:
         dashboard_id: The ID of the dashboard to copy.
         collection_id: Optional collection ID for the new dashboard. Defaults to
                        the same collection as the original.
-        is_deep_copy: When True (default), duplicate all cards so the new
-                      dashboard is independent. When False, share the original
-                      cards between both dashboards.
+        is_deep_copy: When False (default), share the original cards between
+                      both dashboards. When True, duplicate all cards so the
+                      new dashboard is independent.
 
     Returns:
         The newly created dashboard object.
@@ -716,7 +716,7 @@ async def copy_dashboard_tab(
     dashboard_id: int,
     tab_id: int,
     ctx: Context,
-    is_deep_copy: bool = True,
+    is_deep_copy: bool = False,
 ) -> dict[str, Any]:
     """
     Copy a tab within a dashboard, duplicating all its cards and layout.
@@ -726,17 +726,17 @@ async def copy_dashboard_tab(
     and visualization settings are preserved.
 
     Note: Metabase has no API for deep-copying cards at the tab level. When
-    is_deep_copy is False, the new tab's cards reference the same original
-    questions (shallow). When True (default), the entire dashboard is first
+    is_deep_copy is False (default), the new tab's cards reference the same
+    original questions (shallow). When True, the entire dashboard is first
     deep-copied and then the corresponding tab is moved back — ensuring the
     new tab's cards are independent duplicates.
 
     Args:
         dashboard_id: The ID of the dashboard containing the tab.
         tab_id: The ID of the tab to copy.
-        is_deep_copy: When True (default), cards on the new tab are independent
-                      duplicates. When False, the new tab shares the original
-                      questions with the source tab.
+        is_deep_copy: When False (default), the new tab shares the original
+                      questions with the source tab. When True, cards on the
+                      new tab are independent duplicates.
 
     Returns:
         The updated dashboard object containing the new tab.
