@@ -718,13 +718,13 @@ async def copy_dashboard_tab(
     dashboard_id: int,
     tab_id: int,
     ctx: Context,
-    destination_dashboard_id: int | None = None,
+    target_dashboard_id: int | None = None,
     is_deep_copy: bool = True,
 ) -> dict[str, Any]:
     """
     Copy a tab from one dashboard to another (or within the same dashboard).
 
-    Supports cross-dashboard tab copying: pass destination_dashboard_id to place
+    Supports cross-dashboard tab copying: pass target_dashboard_id to place
     the new tab on a different dashboard. If omitted, the tab is copied within
     the same dashboard.
 
@@ -739,7 +739,7 @@ async def copy_dashboard_tab(
     Args:
         dashboard_id: The ID of the dashboard containing the source tab.
         tab_id: The ID of the tab to copy.
-        destination_dashboard_id: ID of the dashboard to place the new tab in.
+        target_dashboard_id: ID of the dashboard to place the new tab in.
                                   If omitted, the tab is copied within dashboard_id.
                                   Use this to copy a tab to a different dashboard.
         is_deep_copy: Default True (deep copy — cards are duplicated and fully
@@ -750,7 +750,7 @@ async def copy_dashboard_tab(
         The updated destination dashboard object containing the new tab.
     """
     try:
-        dest_id = destination_dashboard_id if destination_dashboard_id is not None else dashboard_id
+        dest_id = target_dashboard_id if target_dashboard_id is not None else dashboard_id
         copy_type = "deep" if is_deep_copy else "shallow"
         await ctx.info(
             f"Creating {copy_type} copy of tab {tab_id} from dashboard {dashboard_id} "
