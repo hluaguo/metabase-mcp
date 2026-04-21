@@ -584,6 +584,44 @@ async def update_card_display(
         raise ToolError(error_msg) from e
 
 
+@mcp.tool
+async def set_card_goal_line(
+    card_id: int,
+    value: float,
+    ctx: Context,
+    label: str = "Goal",
+) -> dict[str, Any]:
+    """
+    Set a goal line on a card's visualization.
+
+    Args:
+        card_id: The ID of the card to update.
+        value: The numeric value at which to draw the goal line.
+        label: Label for the goal line (default: "Goal").
+
+    Returns:
+        The updated card object.
+    """
+    try:
+        await ctx.info(f"Setting goal line on card {card_id} to {value} ('{label}')")
+
+        card = await metabase_client.request("GET", f"/card/{card_id}")
+        viz = dict(card.get("visualization_settings") or {})
+        viz["graph.show_goal"] = True
+        viz["graph.goal_value"] = value
+        viz["graph.goal_label"] = label
+
+        result = await metabase_client.request(
+            "PUT", f"/card/{card_id}", json={"visualization_settings": viz}
+        )
+        await ctx.info(f"Successfully set goal line on card {card_id}")
+        return result
+    except Exception as e:
+        error_msg = f"Error setting goal line on card {card_id}: {e}"
+        await ctx.error(error_msg)
+        raise ToolError(error_msg) from e
+
+
 # =============================================================================
 # Tool Definitions - Dashboard Operations
 # =============================================================================

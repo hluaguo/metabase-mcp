@@ -224,6 +224,8 @@ fastmcp install server.py -n "Metabase MCP"
 | `list_cards` | List all saved questions/cards |
 | `create_card` | Create new questions/cards with SQL queries |
 | `create_mongodb_card` | Create new MongoDB questions/cards with native query support |
+| `update_card_display` | Update the display type and visualization settings of a card |
+| `set_card_goal_line` | Set a goal line on a card's visualization with a value and optional label |
 
 ### Dashboard Management
 | Tool | Description |
@@ -231,8 +233,8 @@ fastmcp install server.py -n "Metabase MCP"
 | `list_dashboards` | List all dashboards with metadata |
 | `get_dashboard_cards` | Get cards and layout for a specific dashboard |
 | `add_card_to_dashboard` | Add an existing card to a dashboard at a specified position |
-| `copy_dashboard` | Copy a dashboard including all cards, tabs, and filters. Defaults to shallow copy (shared cards); set `is_deep_copy=true` for independent duplicate cards |
-| `copy_dashboard_tab` | Copy a tab within a dashboard, preserving card layouts, parameter mappings, and visualization settings. Defaults to shallow copy; set `is_deep_copy=true` for independent duplicate cards |
+| `copy_dashboard` | Copy a dashboard including all cards, tabs, and filters. Defaults to deep copy (independent duplicate cards); set `is_deep_copy=false` for a shallow copy that shares the original cards |
+| `copy_dashboard_tab` | Copy a tab to the same or a different dashboard, preserving card layouts, parameter mappings, and visualization settings. Defaults to deep copy (independent duplicate cards); set `is_deep_copy=false` for a shallow copy |
 
 ### Collection Management
 | Tool | Description |
