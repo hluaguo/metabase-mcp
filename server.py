@@ -123,7 +123,10 @@ class MetabaseClient:
         response = await self.client.request(method=method, url=url, headers=headers, **kwargs)
 
         if not response.is_success:
-            error_data = response.json() if response.content else {}
+            try:
+                error_data = response.json() if response.content else {}
+            except Exception:
+                error_data = {}
             error_message = (
                 f"API request failed with status {response.status_code}: {response.text}"
             )
@@ -581,9 +584,178 @@ async def update_card_display(
         raise ToolError(error_msg) from e
 
 
+@mcp.tool
+async def set_card_goal_line(
+    card_id: int,
+    value: float,
+    ctx: Context,
+    label: str = "Goal",
+) -> dict[str, Any]:
+    """
+    Set a goal line on a card's visualization.
+
+    Args:
+        card_id: The ID of the card to update.
+        value: The numeric value at which to draw the goal line.
+        label: Label for the goal line (default: "Goal").
+
+    Returns:
+        The updated card object.
+    """
+    try:
+        await ctx.info(f"Setting goal line on card {card_id} to {value} ('{label}')")
+
+        card = await metabase_client.request("GET", f"/card/{card_id}")
+        viz = dict(card.get("visualization_settings") or {})
+        viz["graph.show_goal"] = True
+        viz["graph.goal_value"] = value
+        viz["graph.goal_label"] = label
+
+        result = await metabase_client.request(
+            "PUT", f"/card/{card_id}", json={"visualization_settings": viz}
+        )
+        await ctx.info(f"Successfully set goal line on card {card_id}")
+        return result
+    except Exception as e:
+        error_msg = f"Error setting goal line on card {card_id}: {e}"
+        await ctx.error(error_msg)
+        raise ToolError(error_msg) from e
+
+
 # =============================================================================
 # Tool Definitions - Dashboard Operations
 # =============================================================================
+
+@mcp.tool
+async def set_dashboard_filter(
+    dashboard_id: int,
+    filter: str,
+    value: Any,
+    ctx: Context,
+) -> dict[str, Any]:
+    """
+    Set the default value of a filter on a dashboard.
+
+    Identifies the filter by matching against its name or slug (case-insensitive).
+
+    Args:
+        dashboard_id: The ID of the dashboard.
+        filter: The name or slug of the filter to update.
+        value: The default value to set for the filter.
+
+    Returns:
+        The updated dashboard object.
+    """
+    try:
+        await ctx.info(f"Setting filter '{filter}' to '{value}' on dashboard {dashboard_id}")
+
+        dashboard = await metabase_client.request("GET", f"/dashboard/{dashboard_id}")
+        parameters = dashboard.get("parameters", [])
+
+        filter_lower = filter.lower()
+        matched = next(
+            (p for p in parameters
+             if p.get("name", "").lower() == filter_lower
+             or p.get("slug", "").lower() == filter_lower),
+            None,
+        )
+        if not matched:
+            raise ValueError(
+                f"No filter named '{filter}' found on dashboard {dashboard_id}. "
+                f"Available filters: {[p.get('name') for p in parameters]}"
+            )
+
+        matched["default"] = value
+        result = await metabase_client.request(
+            "PUT", f"/dashboard/{dashboard_id}", json={"parameters": parameters}
+        )
+        await ctx.info(
+            f"Successfully set filter '{filter}' default to '{value}' on dashboard {dashboard_id}"
+        )
+        return result
+    except Exception as e:
+        error_msg = f"Error setting filter on dashboard {dashboard_id}: {e}"
+        await ctx.error(error_msg)
+        raise ToolError(error_msg) from e
+
+
+@mcp.tool
+async def pin_dashboard(
+    dashboard_id: int,
+    ctx: Context,
+) -> dict[str, Any]:
+    """
+    Pin a dashboard to its collection.
+
+    Fetches the dashboard to determine its collection, then queries that
+    collection to find the highest current pin position and pins the dashboard
+    one position after it.
+
+    Args:
+        dashboard_id: The ID of the dashboard to pin.
+
+    Returns:
+        The updated dashboard object.
+    """
+    try:
+        await ctx.info(f"Pinning dashboard {dashboard_id}")
+
+        dashboard = await metabase_client.request("GET", f"/dashboard/{dashboard_id}")
+        collection_id = dashboard.get("collection_id")
+
+        # Find the highest existing pin position in the collection
+        collection_key = str(collection_id) if collection_id is not None else "root"
+        items = await metabase_client.request("GET", f"/collection/{collection_key}/items")
+        pinned = [
+            item.get("collection_position")
+            for item in items.get("data", [])
+            if item.get("collection_position") is not None
+        ]
+        next_position = max(pinned, default=0) + 1
+
+        result = await metabase_client.request(
+            "PUT", f"/dashboard/{dashboard_id}",
+            json={"collection_position": next_position},
+        )
+        await ctx.info(
+            f"Successfully pinned dashboard {dashboard_id} at position {next_position} "
+            f"in collection {collection_key}"
+        )
+        return result
+    except Exception as e:
+        error_msg = f"Error pinning dashboard {dashboard_id}: {e}"
+        await ctx.error(error_msg)
+        raise ToolError(error_msg) from e
+
+
+@mcp.tool
+async def rename_dashboard(
+    dashboard_id: int,
+    new_name: str,
+    ctx: Context,
+) -> dict[str, Any]:
+    """
+    Rename a dashboard.
+
+    Args:
+        dashboard_id: The ID of the dashboard to rename.
+        new_name: The new name for the dashboard.
+
+    Returns:
+        The updated dashboard object.
+    """
+    try:
+        await ctx.info(f"Renaming dashboard {dashboard_id} to '{new_name}'")
+        result = await metabase_client.request(
+            "PUT", f"/dashboard/{dashboard_id}", json={"name": new_name}
+        )
+        await ctx.info(f"Successfully renamed dashboard {dashboard_id} to '{new_name}'")
+        return result
+    except Exception as e:
+        error_msg = f"Error renaming dashboard {dashboard_id}: {e}"
+        await ctx.error(error_msg)
+        raise ToolError(error_msg) from e
+
 
 @mcp.tool
 async def list_dashboards(ctx: Context) -> list[dict[str, Any]]:
@@ -651,6 +823,217 @@ async def get_dashboard_cards(dashboard_id: int, ctx: Context) -> list[dict[str,
         return cards_layout
     except Exception as e:
         error_msg = f"Error fetching dashboard {dashboard_id} cards: {e}"
+        await ctx.error(error_msg)
+        raise ToolError(error_msg) from e
+
+
+@mcp.tool
+async def copy_dashboard(
+    dashboard_id: int,
+    ctx: Context,
+    collection_id: int | None = None,
+    is_deep_copy: bool = True,
+) -> dict[str, Any]:
+    """
+    Create a copy of a dashboard, including all cards, tabs, and filters.
+
+    The new dashboard is named "{original name} - Copy".
+
+    By default performs a deep copy — all cards are duplicated so the new
+    dashboard is fully independent of the original. Pass is_deep_copy=False
+    only when the user explicitly requests a shallow copy; in that case the
+    new dashboard shares the original cards and changes to those questions
+    will affect both dashboards.
+
+    Args:
+        dashboard_id: The ID of the dashboard to copy.
+        collection_id: Optional collection ID for the new dashboard. Defaults to
+                       the same collection as the original.
+        is_deep_copy: Default True (deep copy — cards are duplicated and fully
+                      independent). Set False only when the user explicitly
+                      requests a shallow/shared copy.
+
+    Returns:
+        The newly created dashboard object.
+    """
+    try:
+        copy_type = "deep" if is_deep_copy else "shallow"
+        await ctx.info(f"Creating {copy_type} copy of dashboard {dashboard_id}")
+
+        original = await metabase_client.request("GET", f"/dashboard/{dashboard_id}")
+        original_name = original.get("name", "Dashboard")
+        target_collection_id = collection_id if collection_id is not None else original.get("collection_id")
+
+        payload: dict[str, Any] = {"name": f"{original_name} - Copy", "is_deep_copy": is_deep_copy}
+        if target_collection_id is not None:
+            payload["collection_id"] = target_collection_id
+
+        result = await metabase_client.request(
+            "POST", f"/dashboard/{dashboard_id}/copy", json=payload
+        )
+        await ctx.info(
+            f"Successfully created {copy_type} copy of dashboard {dashboard_id} "
+            f"→ new dashboard {result.get('id')}"
+        )
+        return result
+    except Exception as e:
+        error_msg = f"Error copying dashboard {dashboard_id}: {e}"
+        await ctx.error(error_msg)
+        raise ToolError(error_msg) from e
+
+
+@mcp.tool
+async def copy_dashboard_tab(
+    dashboard_id: int,
+    tab_id: int,
+    ctx: Context,
+    target_dashboard_id: int | None = None,
+    is_deep_copy: bool = True,
+) -> dict[str, Any]:
+    """
+    Copy a tab from one dashboard to another (or within the same dashboard).
+
+    Supports cross-dashboard tab copying: pass target_dashboard_id to place
+    the new tab on a different dashboard. If omitted, the tab is copied within
+    the same dashboard.
+
+    The new tab is named "{original tab name} - Copy" and appended to the end
+    of the destination dashboard's tab list. All card positions, sizes,
+    parameter mappings, and visualization settings are preserved.
+
+    By default performs a deep copy — all cards are duplicated so the new tab
+    is fully independent. Pass is_deep_copy=False only when the user explicitly
+    requests a shallow copy; in that case the new tab shares the original cards.
+
+    Args:
+        dashboard_id: The ID of the dashboard containing the source tab.
+        tab_id: The ID of the tab to copy.
+        target_dashboard_id: ID of the dashboard to place the new tab in.
+                                  If omitted, the tab is copied within dashboard_id.
+                                  Use this to copy a tab to a different dashboard.
+        is_deep_copy: Default True (deep copy — cards are duplicated and fully
+                      independent). Set False only when the user explicitly
+                      requests a shallow/shared copy.
+
+    Returns:
+        The updated destination dashboard object containing the new tab.
+    """
+    try:
+        dest_id = target_dashboard_id if target_dashboard_id is not None else dashboard_id
+        copy_type = "deep" if is_deep_copy else "shallow"
+        await ctx.info(
+            f"Creating {copy_type} copy of tab {tab_id} from dashboard {dashboard_id} "
+            f"to dashboard {dest_id}"
+        )
+
+        # Fetch source dashboard to locate the tab and its cards
+        source_dashboard = await metabase_client.request("GET", f"/dashboard/{dashboard_id}")
+        source_tabs = source_dashboard.get("tabs", [])
+        source_dashcards = source_dashboard.get("dashcards", source_dashboard.get("ordered_cards", []))
+
+        source_tab = next((t for t in source_tabs if t.get("id") == tab_id), None)
+        if not source_tab:
+            raise ValueError(f"Tab {tab_id} not found in dashboard {dashboard_id}")
+
+        new_tab_name = f"{source_tab.get('name', 'Tab')} - Copy"
+        tab_dashcards = [dc for dc in source_dashcards if dc.get("dashboard_tab_id") == tab_id]
+
+        # Fetch destination dashboard (may be the same as source)
+        if dest_id == dashboard_id:
+            dest_dashboard = source_dashboard
+        else:
+            dest_dashboard = await metabase_client.request("GET", f"/dashboard/{dest_id}")
+
+        dest_tabs = dest_dashboard.get("tabs", [])
+        dest_dashcards = dest_dashboard.get("dashcards", dest_dashboard.get("ordered_cards", []))
+
+        existing_dashcards_payload = [
+            {
+                "id": dc["id"],
+                "card_id": dc.get("card_id"),
+                "row": dc.get("row"),
+                "col": dc.get("col"),
+                "size_x": dc.get("size_x"),
+                "size_y": dc.get("size_y"),
+                "dashboard_tab_id": dc.get("dashboard_tab_id"),
+                "parameter_mappings": dc.get("parameter_mappings", []),
+                "visualization_settings": dc.get("visualization_settings", {}),
+            }
+            for dc in dest_dashcards
+        ]
+
+        # Step 1: add the new tab to the destination dashboard
+        tabs_payload = [{"id": t["id"], "name": t["name"]} for t in dest_tabs]
+        tabs_payload.append({"id": -1, "name": new_tab_name})
+
+        step1 = await metabase_client.request(
+            "PUT", f"/dashboard/{dest_id}",
+            json={"tabs": tabs_payload, "dashcards": existing_dashcards_payload},
+        )
+
+        new_tab = next((t for t in step1.get("tabs", []) if t.get("name") == new_tab_name), None)
+        if not new_tab:
+            raise Exception("New tab was not returned by Metabase after creation")
+        new_tab_id = new_tab["id"]
+        await ctx.debug(f"Created new tab with ID {new_tab_id}")
+
+        # Step 2: build the new dashcards for the copied tab
+        if is_deep_copy:
+            # Copy each card individually via POST /api/card/:id/copy so the new tab
+            # gets independent duplicates without touching the rest of the dashboard.
+            await ctx.debug(f"Copying {len(tab_dashcards)} cards individually")
+            new_dashcards = []
+            for i, dc in enumerate(tab_dashcards):
+                card_id = dc.get("card_id")
+                if card_id is not None:
+                    new_card = await metabase_client.request("POST", f"/card/{card_id}/copy")
+                    new_card_id = new_card.get("id")
+                    await ctx.debug(f"Copied card {card_id} → {new_card_id}")
+                else:
+                    new_card_id = None
+                new_dashcards.append({
+                    "id": -(i + 1),
+                    "card_id": new_card_id,
+                    "row": dc.get("row"),
+                    "col": dc.get("col"),
+                    "size_x": dc.get("size_x"),
+                    "size_y": dc.get("size_y"),
+                    "dashboard_tab_id": new_tab_id,
+                    "parameter_mappings": dc.get("parameter_mappings", []),
+                    "visualization_settings": dc.get("visualization_settings", {}),
+                })
+        else:
+            # Shallow copy: new tab shares the original card IDs
+            new_dashcards = [
+                {
+                    "id": -(i + 1),
+                    "card_id": dc.get("card_id"),
+                    "row": dc.get("row"),
+                    "col": dc.get("col"),
+                    "size_x": dc.get("size_x"),
+                    "size_y": dc.get("size_y"),
+                    "dashboard_tab_id": new_tab_id,
+                    "parameter_mappings": dc.get("parameter_mappings", []),
+                    "visualization_settings": dc.get("visualization_settings", {}),
+                }
+                for i, dc in enumerate(tab_dashcards)
+            ]
+
+        all_dashcards = existing_dashcards_payload + new_dashcards
+        step1_tabs = [{"id": t["id"], "name": t["name"]} for t in step1.get("tabs", [])]
+
+        result = await metabase_client.request(
+            "PUT", f"/dashboard/{dest_id}",
+            json={"tabs": step1_tabs, "dashcards": all_dashcards},
+        )
+
+        await ctx.info(
+            f"Successfully created {copy_type} copy of tab {tab_id} → new tab {new_tab_id} "
+            f"with {len(new_dashcards)} cards in dashboard {dest_id}"
+        )
+        return result
+    except Exception as e:
+        error_msg = f"Error copying tab {tab_id} from dashboard {dashboard_id}: {e}"
         await ctx.error(error_msg)
         raise ToolError(error_msg) from e
 
