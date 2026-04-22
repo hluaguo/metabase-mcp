@@ -680,6 +680,55 @@ async def set_dashboard_filter(
 
 
 @mcp.tool
+async def pin_dashboard(
+    dashboard_id: int,
+    ctx: Context,
+) -> dict[str, Any]:
+    """
+    Pin a dashboard to its collection.
+
+    Fetches the dashboard to determine its collection, then queries that
+    collection to find the highest current pin position and pins the dashboard
+    one position after it.
+
+    Args:
+        dashboard_id: The ID of the dashboard to pin.
+
+    Returns:
+        The updated dashboard object.
+    """
+    try:
+        await ctx.info(f"Pinning dashboard {dashboard_id}")
+
+        dashboard = await metabase_client.request("GET", f"/dashboard/{dashboard_id}")
+        collection_id = dashboard.get("collection_id")
+
+        # Find the highest existing pin position in the collection
+        collection_key = str(collection_id) if collection_id is not None else "root"
+        items = await metabase_client.request("GET", f"/collection/{collection_key}/items")
+        pinned = [
+            item.get("collection_position")
+            for item in items.get("data", [])
+            if item.get("collection_position") is not None
+        ]
+        next_position = max(pinned, default=0) + 1
+
+        result = await metabase_client.request(
+            "PUT", f"/dashboard/{dashboard_id}",
+            json={"collection_position": next_position},
+        )
+        await ctx.info(
+            f"Successfully pinned dashboard {dashboard_id} at position {next_position} "
+            f"in collection {collection_key}"
+        )
+        return result
+    except Exception as e:
+        error_msg = f"Error pinning dashboard {dashboard_id}: {e}"
+        await ctx.error(error_msg)
+        raise ToolError(error_msg) from e
+
+
+@mcp.tool
 async def rename_dashboard(
     dashboard_id: int,
     new_name: str,
