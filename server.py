@@ -627,6 +627,88 @@ async def set_card_goal_line(
 # =============================================================================
 
 @mcp.tool
+async def set_dashboard_filter(
+    dashboard_id: int,
+    filter: str,
+    value: Any,
+    ctx: Context,
+) -> dict[str, Any]:
+    """
+    Set the default value of a filter on a dashboard.
+
+    Identifies the filter by matching against its name or slug (case-insensitive).
+
+    Args:
+        dashboard_id: The ID of the dashboard.
+        filter: The name or slug of the filter to update.
+        value: The default value to set for the filter.
+
+    Returns:
+        The updated dashboard object.
+    """
+    try:
+        await ctx.info(f"Setting filter '{filter}' to '{value}' on dashboard {dashboard_id}")
+
+        dashboard = await metabase_client.request("GET", f"/dashboard/{dashboard_id}")
+        parameters = dashboard.get("parameters", [])
+
+        filter_lower = filter.lower()
+        matched = next(
+            (p for p in parameters
+             if p.get("name", "").lower() == filter_lower
+             or p.get("slug", "").lower() == filter_lower),
+            None,
+        )
+        if not matched:
+            raise ValueError(
+                f"No filter named '{filter}' found on dashboard {dashboard_id}. "
+                f"Available filters: {[p.get('name') for p in parameters]}"
+            )
+
+        matched["default"] = value
+        result = await metabase_client.request(
+            "PUT", f"/dashboard/{dashboard_id}", json={"parameters": parameters}
+        )
+        await ctx.info(
+            f"Successfully set filter '{filter}' default to '{value}' on dashboard {dashboard_id}"
+        )
+        return result
+    except Exception as e:
+        error_msg = f"Error setting filter on dashboard {dashboard_id}: {e}"
+        await ctx.error(error_msg)
+        raise ToolError(error_msg) from e
+
+
+@mcp.tool
+async def rename_dashboard(
+    dashboard_id: int,
+    new_name: str,
+    ctx: Context,
+) -> dict[str, Any]:
+    """
+    Rename a dashboard.
+
+    Args:
+        dashboard_id: The ID of the dashboard to rename.
+        new_name: The new name for the dashboard.
+
+    Returns:
+        The updated dashboard object.
+    """
+    try:
+        await ctx.info(f"Renaming dashboard {dashboard_id} to '{new_name}'")
+        result = await metabase_client.request(
+            "PUT", f"/dashboard/{dashboard_id}", json={"name": new_name}
+        )
+        await ctx.info(f"Successfully renamed dashboard {dashboard_id} to '{new_name}'")
+        return result
+    except Exception as e:
+        error_msg = f"Error renaming dashboard {dashboard_id}: {e}"
+        await ctx.error(error_msg)
+        raise ToolError(error_msg) from e
+
+
+@mcp.tool
 async def list_dashboards(ctx: Context) -> list[dict[str, Any]]:
     """
     List all dashboards in Metabase.

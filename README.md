@@ -231,6 +231,8 @@ fastmcp install server.py -n "Metabase MCP"
 | Tool | Description |
 |------|------------|
 | `list_dashboards` | List all dashboards with metadata |
+| `rename_dashboard` | Rename a dashboard |
+| `set_dashboard_filter` | Set the default value of a filter on a dashboard, identified by name or slug |
 | `get_dashboard_cards` | Get cards and layout for a specific dashboard |
 | `add_card_to_dashboard` | Add an existing card to a dashboard at a specified position |
 | `copy_dashboard` | Copy a dashboard including all cards, tabs, and filters. Defaults to deep copy (independent duplicate cards); set `is_deep_copy=false` for a shallow copy that shares the original cards |
